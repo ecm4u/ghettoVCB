@@ -1,14 +1,15 @@
 # Author: William Lam
 # Created Date: 11/17/2008
 # http://www.virtuallyghetto.com/
+# https://github.com/lamw/ghettoVCB
 # http://communities.vmware.com/docs/DOC-8760
 
 ##################################################################
 #                   User Definable Parameters
 ##################################################################
 
-LAST_MODIFIED_DATE=2017_12_09
-VERSION=1
+LAST_MODIFIED_DATE=2019_01_06
+VERSION=4
 
 # directory that all VM backups should go (e.g. /vmfs/volumes/SAN_LUN1/mybackupdir)
 VM_BACKUP_VOLUME=/vmfs/volumes/mini-local-datastore-hdd/backups
@@ -98,6 +99,12 @@ EMAIL_SERVER=auroa.primp-industries.com
 # Email SMTP server port
 EMAIL_SERVER_PORT=25
 
+# Email SMTP username
+EMAIL_USER_NAME=
+
+# Email SMTP password
+EMAIL_USER_PASSWORD=
+
 # Email FROM
 EMAIL_FROM=root@ghettoVCB
 
@@ -130,7 +137,7 @@ ADDITIONAL_ROTATION_PATH=
 #This code has been in production on the authors systems for the last 2 years.
 
 # Enable use of the NFS IO HACK for all NAS commands 1=yes, 0=no
-# 0 uses the script in it's original state.  
+# 0 uses the script in it's original state.
 ENABLE_NFS_IO_HACK=0
 
 # Set this value to determine how many times the script tries to work arround I/O errors each time the NAS slows down.
@@ -247,7 +254,7 @@ sanityCheck() {
     LOG_TO_STDOUT=1
 
     #if no logfile then provide default logfile in /tmp
-    
+
     if [[ -z "${LOG_OUTPUT}" ]] ; then
         LOG_OUTPUT="/tmp/ghettoVCB-$(date +%F_%H-%M-%S)-$$.log"
         echo "Logging output to \"${LOG_OUTPUT}\" ..."
@@ -367,7 +374,7 @@ captureDefaultConfigurations() {
     DEFAULT_BACKUP_FILES_CHMOD="${BACKUP_FILES_CHMOD}"
 	# Added the NFS_IO_HACK values below
     DEFAULT_NFS_IO_HACK_LOOP_MAX="${NFS_IO_HACK_LOOP_MAX}"
-    DEFAULT_NFS_IO_HACK_SLEEP_TIMER="${NFS_IO_HACK_SLEEP_TIMER}"    
+    DEFAULT_NFS_IO_HACK_SLEEP_TIMER="${NFS_IO_HACK_SLEEP_TIMER}"
     DEFAULT_NFS_BACKUP_DELAY="${NFS_BACKUP_DELAY}"
     DEFAULT_ENABLE_NFS_IO_HACK="${ENABLE_NFS_IO_HACK}"
 }
@@ -440,7 +447,7 @@ findVMDK() {
         VMDK_FILE=$(echo $k | sed -e 's/^[[:blank:]]*//;s/[[:blank:]]*$//')
         if [[ "${VMDK_FILE}" == "${VMDK_TO_SEARCH_FOR}" ]] ; then
             logger "debug" "findVMDK() - Found VMDK! - \"${VMDK_TO_SEARCH_FOR}\" to backup"
-           isVMDKFound=1
+            isVMDKFound=1
         fi
     done
     IFS="${OLD_IFS2}"
@@ -500,7 +507,7 @@ getVMDKs() {
                         DISK_SIZE=$(echo "${DISK_SIZE_IN_SECTORS}" | awk '{printf "%.0f\n",$1*512/1024/1024/1024}')
                         VMDKS="${DISK}###${DISK_SIZE}:${VMDKS}"
                         TOTAL_VM_SIZE=$((TOTAL_VM_SIZE_IN+DISK_SIZE))
-                   fi
+                    fi
                 fi
 
             else
@@ -525,8 +532,8 @@ dumpVMConfigurations() {
     logger "info" "CONFIG - VERSION = ${VERSION_STRING}"
     logger "info" "CONFIG - GHETTOVCB_PID = ${GHETTOVCB_PID}"
     logger "info" "CONFIG - VM_BACKUP_VOLUME = ${VM_BACKUP_VOLUME}"
-    if [[ "${ENABLE_NON_PERSISTENT_NFS}" -eq 1 ]]; then
-        logger "info" "CONFIG - ENABLE_NON_PERSISTENT_NFS = ${ENABLE_NON_PERSISTENT_NFS}"
+    logger "info" "CONFIG - ENABLE_NON_PERSISTENT_NFS = ${ENABLE_NON_PERSISTENT_NFS}"
+	if [[ "${ENABLE_NON_PERSISTENT_NFS}" -eq 1 ]]; then
         logger "info" "CONFIG - UNMOUNT_NFS = ${UNMOUNT_NFS}"
         logger "info" "CONFIG - NFS_SERVER = ${NFS_SERVER}"
         logger "info" "CONFIG - NFS_VERSION = ${NFS_VERSION}"
@@ -564,9 +571,10 @@ dumpVMConfigurations() {
 		logger "info" "CONFIG - ENABLE NFS IO HACK = ${ENABLE_NFS_IO_HACK}"
 		logger "info" "CONFIG - NFS IO HACK LOOP MAX = ${NFS_IO_HACK_LOOP_MAX}"
 		logger "info" "CONFIG - NFS IO HACK SLEEP TIMER = ${NFS_IO_HACK_SLEEP_TIMER}"
-		logger "info" "CONFIG - NFS BACKUP DELAY = ${NFS_BACKUP_DELAY}"
+		logger "info" "CONFIG - NFS BACKUP DELAY = ${NFS_BACKUP_DELAY}\n"
+	else
+	    logger "info" "CONFIG - ENABLE NFS IO HACK = ${ENABLE_NFS_IO_HACK}\n"
 	fi
-    logger "\n"
 }
 
 # Added the function below to allow reuse of the basics of the original hack in more places in the script.
@@ -576,16 +584,16 @@ NfsIoHack() {
     NFS_IO_HACK_COUNTER=0
     NFS_IO_HACK_STATUS=0
     NFS_IO_HACK_FILECHECK="$BACKUP_DIR_PATH/nfs_io.check"
-    
+
     while [[ "${NFS_IO_HACK_STATUS}" -eq 0 ]] && [[ "${NFS_IO_HACK_COUNTER}" -lt "${NFS_IO_HACK_LOOP_MAX}" ]]; do
-       touch "${NFS_IO_HACK_FILECHECK}"
-       if [[ $? -ne 0 ]] ; then
-           sleep "${NFS_IO_HACK_SLEEP_TIMER}"
-           NFS_IO_HACK_COUNTER=$((NFS_IO_HACK_COUNTER+1))
-       fi
-       [[ $? -eq 0 ]] && NFS_IO_HACK_STATUS=1
+        touch "${NFS_IO_HACK_FILECHECK}"
+        if [[ $? -ne 0 ]] ; then
+            sleep "${NFS_IO_HACK_SLEEP_TIMER}"
+            NFS_IO_HACK_COUNTER=$((NFS_IO_HACK_COUNTER+1))
+        fi
+        [[ $? -eq 0 ]] && NFS_IO_HACK_STATUS=1
     done
-    
+
     NFS_IO_HACK_SLEEP_TIME=$((NFS_IO_HACK_COUNTER*NFS_IO_HACK_SLEEP_TIMER))
 
     rm -rf "${NFS_IO_HACK_FILECHECK}"
@@ -606,7 +614,7 @@ Get_Final_Status_Sendemail() {
     logger "debug" "Succesfully removed lock directory - ${WORKDIR}\n"
     logger "info" "============================== ghettoVCB LOG END ================================\n"
 
-    sendMail 
+    sendMail
 }
 
 indexedRotate() {
@@ -637,7 +645,7 @@ indexedRotate() {
                 mv -f ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i.gz ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$((i+1)).gz
 				# Added the NFS_IO_HACK check and function call here.  Some NAS devices slow at this step.
                 if [[ $? -ne 0 ]]  && [[ "${ENABLE_NFS_IO_HACK}" -eq 1 ]]; then
-                   NfsIoHack
+                    NfsIoHack
                 fi
                 if [[ $? -eq 0 ]]; then
                     logger "info" "Moved ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i.gz to ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$((i+1)).gz"
@@ -651,7 +659,7 @@ indexedRotate() {
                 rm -rf ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i
 				# Added the NFS_IO_HACK check and function call here.  Some NAS devices slow at this step.
                 if [[ $? -ne 0 ]]  && [[ "${ENABLE_NFS_IO_HACK}" -eq 1 ]]; then
-                   NfsIoHack
+                    NfsIoHack
                 fi
                 if [[ $? -eq 0 ]]; then
                     logger "info" "Deleted ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i"
@@ -662,7 +670,7 @@ indexedRotate() {
                 mv -f ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$((i+1))
 				# Added the NFS_IO_HACK check and function call here.  Some NAS devices slow at this step.
                 if [[ $? -ne 0 ]]  && [[ "${ENABLE_NFS_IO_HACK}" -eq 1 ]]; then
-                   NfsIoHack
+                    NfsIoHack
                 fi
                 if [[ $? -eq 0 ]]; then
                     logger "info" "Moved ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$i to ${BACKUP_DIR_PATH}/${VM_TO_SEARCH_FOR}-$((i+1))"
@@ -725,7 +733,7 @@ checkVMBackupRotation() {
 					done
 
 					NFS_IO_HACK_SLEEP_TIME=$((NFS_IO_HACK_COUNTER*NFS_IO_HACK_SLEEP_TIMER))
-				
+
 					rm -rf "${NFS_IO_HACK_FILECHECK}"
 
 					if [[ "${NFS_IO_HACK_STATUS}" -eq 1 ]] ; then
@@ -929,10 +937,10 @@ ghettoVCB() {
         IFS="${IFS2}"
     fi
 
-    for VM_NAME in $(cat "${VM_INPUT}" | grep -v "#" | sed '/^$/d' | sed -e 's/^[[:blank:]]*//;s/[[:blank:]]*$//'); do
+    for VM_NAME in $(cat "${VM_INPUT}" | grep -v "^#" | sed '/^$/d' | sed -e 's/^[[:blank:]]*//;s/[[:blank:]]*$//'); do
         IGNORE_VM=0
         if [[ "${EXCLUDE_SOME_VMS}" -eq 1 ]] ; then
-            grep -E "^${VM_NAME}" "${VM_EXCLUSION_FILE}" > /dev/null 2>&1
+            grep -E "^${VM_NAME}\$" "${VM_EXCLUSION_FILE}" > /dev/null 2>&1
             if [[ $? -eq 0 ]] ; then
                 IGNORE_VM=1
                 #VM_FAILED=0   #Excluded VM is NOT a failure. No need to set here, but listed for clarity
@@ -940,7 +948,7 @@ ghettoVCB() {
         fi
 
         if [[ "${IGNORE_VM}" -eq 0 ]] && [[ -n "${PROBLEM_VMS}" ]] ; then
-            if [[ "${PROBLEM_VMS/$VM_NAME}" != "$PROBLEM_VMS" ]] ; then
+            if [[ "$(echo $PROBLEM_VMS | sed "s@$VM_NAME@@")" != "$PROBLEM_VMS" ]] ; then
                 logger "info" "Ignoring ${VM_NAME} as a problem VM\n"
                 IGNORE_VM=1
                 #A VM ignored due to a problem, should be treated as a failure
@@ -1014,7 +1022,7 @@ ghettoVCB() {
 
             logger "dryrun" "TOTAL_VM_SIZE_TO_BACKUP: ${TOTAL_VM_SIZE} GB"
             if [[ ${HAS_INDEPENDENT_DISKS} -eq 1 ]] ; then
-                logger "dryrun" "Snapshots can not be taken for indepdenent disks!"
+                logger "dryrun" "Snapshots can not be taken for independent disks!"
                 logger "dryrun" "THIS VIRTUAL MACHINE WILL NOT HAVE ALL ITS VMDKS BACKED UP!"
             fi
 
@@ -1037,7 +1045,7 @@ ghettoVCB() {
         elif [[ -f "${VMX_PATH}" ]] && [[ ! -z "${VMX_PATH}" ]]; then
             if ls "${VMX_DIR}" | grep -q "\-delta\.vmdk" > /dev/null 2>&1; then
                 if [ ${ALLOW_VMS_WITH_SNAPSHOTS_TO_BE_BACKEDUP} -eq 0 ]; then
-                    logger "info" "Snapshot found for ${VM_NAME}, backup will not take place\n"
+                    logger "error" "Snapshot found for ${VM_NAME}, backup will not take place\n"
                     VM_FAILED=1
                     continue
                 elif [ ${ALLOW_VMS_WITH_SNAPSHOTS_TO_BE_BACKEDUP} -eq 1 ]; then
@@ -1284,17 +1292,18 @@ ghettoVCB() {
                     logger "info" "WARN: ${VM_NAME} has some Independent VMDKs that can not be backed up!\n";
                     [[ ${ENABLE_COMPRESSION} -eq 1 ]] && [[ $COMPRESSED_OK -eq 1 ]] || echo "WARN: ${VM_NAME} has some Independent VMDKs that can not be backed up" > ${VM_BACKUP_DIR}/STATUS.warn
                     VMDK_FAILED=1
-                    #experimental
+
                     #create symlink for the very last backup to support rsync functionality for additinal replication
                     if [[ "${RSYNC_LINK}" -eq 1 ]] ; then
                         SYMLINK_DST=${VM_BACKUP_DIR}
                         if [[ ${ENABLE_COMPRESSION} -eq 1 ]]; then
                             SYMLINK_DST1="${RSYNC_LINK_DIR}.gz"
                         else
-                            SYMLINK_DST1=${RSYNC_LINK_DIR}
+                            SYMLINK_DST1="${RSYNC_LINK_DIR}"
                         fi
-                        SYMLINK_SRC="$(echo "${SYMLINK_DST%*-*-*-*_*-*-*}")-symlink"
+                        SYMLINK_SRC="${BACKUP_DIR}/${VM_NAME}-symlink"
                         logger "info" "Creating symlink \"${SYMLINK_SRC}\" to \"${SYMLINK_DST1}\""
+                        rm -f "${SYMLINK_SRC}"
                         ln -sfn "${SYMLINK_DST1}" "${SYMLINK_SRC}"
                     fi
 
@@ -1305,17 +1314,17 @@ ghettoVCB() {
                     [[ ${ENABLE_COMPRESSION} -eq 1 ]] && [[ $COMPRESSED_OK -eq 1 ]] || echo "Successfully completed backup" > ${VM_BACKUP_DIR}/STATUS.ok
                     VM_OK=1
 
-                    #experimental
                     #create symlink for the very last backup to support rsync functionality for additinal replication
                     if [[ "${RSYNC_LINK}" -eq 1 ]] ; then
                         SYMLINK_DST=${VM_BACKUP_DIR}
                         if [[ ${ENABLE_COMPRESSION} -eq 1 ]] ; then
                             SYMLINK_DST1="${RSYNC_LINK_DIR}.gz"
                         else
-                            SYMLINK_DST1=${RSYNC_LINK_DIR}
+                            SYMLINK_DST1="${RSYNC_LINK_DIR}"
                         fi
-                        SYMLINK_SRC="$(echo "${SYMLINK_DST%*-*-*-*_*-*-*}")-symlink"
+                        SYMLINK_SRC="${BACKUP_DIR}/${VM_NAME}-symlink"
                         logger "info" "Creating symlink \"${SYMLINK_SRC}\" to \"${SYMLINK_DST1}\""
+                        rm -f "${SYMLINK_SRC}"
                         ln -sfn "${SYMLINK_DST1}" "${SYMLINK_SRC}"
                     fi
 
@@ -1337,7 +1346,7 @@ ghettoVCB() {
                 fi
             fi
         fi
-		
+
 		# Added the NFS_IO_HACK check and function call here.  Some NAS devices slow during the write of the files.
 		# Added the Brute-force delay in case it is needed.
 		if [[ "${ENABLE_NFS_IO_HACK}" -eq 1 ]]; then
@@ -1417,6 +1426,12 @@ buildHeaders() {
     EMAIL_ADDRESS=$1
 
     echo -ne "HELO $(hostname -s)\r\n" > "${EMAIL_LOG_HEADER}"
+    if [[ ! -z "${EMAIL_USER_NAME}" ]]; then
+        echo -ne "EHLO $(hostname -s)\r\n" >> "${EMAIL_LOG_HEADER}"
+        echo -ne "AUTH LOGIN\r\n" >> "${EMAIL_LOG_HEADER}"
+        echo -ne "$(echo -n "${EMAIL_USER_NAME}" |openssl base64 2>&1 |tail -1)\r\n" >> "${EMAIL_LOG_HEADER}"
+        echo -ne "$(echo -n "${EMAIL_USER_PASSWORD}" |openssl base64 2>&1 |tail -1)\r\n" >> "${EMAIL_LOG_HEADER}"
+    fi
     echo -ne "MAIL FROM: <${EMAIL_FROM}>\r\n" >> "${EMAIL_LOG_HEADER}"
     echo -ne "RCPT TO: <${EMAIL_ADDRESS}>\r\n" >> "${EMAIL_LOG_HEADER}"
     echo -ne "DATA\r\n" >> "${EMAIL_LOG_HEADER}"
@@ -1433,6 +1448,15 @@ buildHeaders() {
 
     cat "${EMAIL_LOG_HEADER}" > "${EMAIL_LOG_CONTENT}"
     cat "${EMAIL_LOG_OUTPUT}" >> "${EMAIL_LOG_CONTENT}"
+}
+
+sendDelay() {
+    c=0
+    while read L; do
+    	[ $c -lt 4 ] && sleep ${EMAIL_DELAY_INTERVAL}
+    	c=$((c+1))
+    	echo $L
+    done
 }
 
 sendMail() {
@@ -1456,7 +1480,7 @@ sendMail() {
             LOG_STATUS="ERROR"
         #    for i in ${EMAIL_TO}; do
         #        buildHeaders ${i}
-        #        cat "${EMAIL_LOG_CONTENT}" |while read L; do sleep "${EMAIL_DELAY_INTERVAL}"; echo $L; done | "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
+        #        cat "${EMAIL_LOG_CONTENT}" | sendDelay| "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
         #        #"${NC_BIN}" -i "${EMAIL_DELAY_INTERVAL}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" < "${EMAIL_LOG_CONTENT}" > /dev/null 2>&1
         #        if [[ $? -eq 1 ]] ; then
         #            logger "info" "ERROR: Failed to email log output to ${EMAIL_SERVER}:${EMAIL_SERVER_PORT} to ${EMAIL_TO}\n"
@@ -1479,7 +1503,7 @@ sendMail() {
             IFS=','
             for i in ${EMAIL_TO}; do
                 buildHeaders ${i}
-                cat "${EMAIL_LOG_CONTENT}" |while read L; do sleep "${EMAIL_DELAY_INTERVAL}"; echo $L; done | "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
+                cat "${EMAIL_LOG_CONTENT}" | sendDelay| "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
                 #"${NC_BIN}" -i "${EMAIL_DELAY_INTERVAL}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" < "${EMAIL_LOG_CONTENT}" > /dev/null 2>&1
                 if [[ $? -eq 1 ]] ; then
                     logger "info" "ERROR: Failed to email log output to ${EMAIL_SERVER}:${EMAIL_SERVER_PORT} to ${EMAIL_TO}\n"
@@ -1488,7 +1512,7 @@ sendMail() {
             unset IFS
         else
             buildHeaders ${EMAIL_TO}
-            cat "${EMAIL_LOG_CONTENT}" |while read L; do sleep "${EMAIL_DELAY_INTERVAL}"; echo $L; done | "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
+            cat "${EMAIL_LOG_CONTENT}" | sendDelay| "${NC_BIN}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" > /dev/null 2>&1
             #"${NC_BIN}" -i "${EMAIL_DELAY_INTERVAL}" "${EMAIL_SERVER}" "${EMAIL_SERVER_PORT}" < "${EMAIL_LOG_CONTENT}" > /dev/null 2>&1
             if [[ $? -eq 1 ]] ; then
                 logger "info" "ERROR: Failed to email log output to ${EMAIL_SERVER}:${EMAIL_SERVER_PORT} to ${EMAIL_TO}\n"
