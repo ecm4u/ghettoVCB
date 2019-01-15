@@ -1,3 +1,9 @@
+Author: Heiko Robert
+# 01/14/2019
+# http://www.ecm4u.de
+##################################################################
+
+
 # requires ar from binutils:
 # apt install binutils
 
