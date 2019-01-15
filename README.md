@@ -11,17 +11,23 @@ The build script is implemented for the *bash* shell and therefore requires any 
 ### Installation, Running
 
 Clone the repo to a linux system.
-Additionally you need the ar command to create the vib archive. This can be installed with the binutiles packages.
+Additionally you need the ar command to create the vib archive. This can be installed with the binutils packages.
 e.g.
 ```
 apt install binutils
 ```
 
-Then run the script 
+Then run the script which will return you the command to deploy the new vib for convenience
 
 ```
 cd ghettoVCB
 ./create-vib.sh
+FINISHED
+
+you could deploy the new vib by running:
+scp dist/ghettoVCB-1.0.0.vib root@vmserver-1:/tmp/
+ssh root@vmserver-1 "esxcli software vib remove -f -n ghettoVCB"
+ssh root@vmserver-1 "esxcli software vib install -f -v /tmp/ghettoVCB-1.0.0.vib"
 ```
 
 All module parameters are stored in the descriptor.xml.tmpl. Additional some parameters are stored in vib.env
